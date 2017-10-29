@@ -19,7 +19,9 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
             }
         }
     }
-    std::cout << grid[matrixSize[0]-1][matrixSize[1]-1][matrixSize[2]-1];
+    for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud->begin(); it!= cloud->end(); it++){
+        // std::cout << it->x << ", " << it->y << ", " << it->z << std::endl;
+    }
 }
 
 int main (int argc, char * argv[])
