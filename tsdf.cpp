@@ -1,7 +1,6 @@
 // include required libraries
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
-#include <pcl/visualization/cloud_viewer.h>
 #include "marching_cubes.h"
 
 uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 200},{245, 130, 48},{145, 30, 180},
@@ -27,7 +26,7 @@ int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, in
 
 }
 
-void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr componentCloud, int startPoint[3], int matrixSize[3])
+void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoint[3], int matrixSize[3], std::vector<std::vector<std::vector<float>>>& tsdfGrid)
 {
     // Set up grid in heap
     // 0: empty; 1: occupied, >1: visited
@@ -69,7 +68,9 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCl
         }
     }
 
-    // Point cloud visualization
+    // Add points to the point cloud for visualization
+    pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);
     for (int i = 0; i < matrixSize[0]; i++) {
         for (int j = 0; j < matrixSize[1]; j++) {
             for (int k = 0; k < matrixSize[2];k++) {
@@ -79,22 +80,21 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCl
                         point.x = i;
                         point.y = j;
                         point.z = k;
-                        componentCloud->push_back(point);
+                        componentCloud.push_back(point);
 
                     }else{
                         pcl::PointXYZRGB point = pcl::PointXYZRGB(rgbTable[grid[i][j][k]%20][0], rgbTable[grid[i][j][k]%20][1], rgbTable[grid[i][j][k]%20][2]);
                         point.x = i;
                         point.y = j;
                         point.z = k;
-                        componentCloud->push_back(point);
+                        componentCloud.push_back(point);
                     }
                 }
             }
         }
     }
-
     // Run marching cubes
-    MarchingCubes::marchingCube(matrixSize,grid,largest);
+    MarchingCubes::marchingCube(matrixSize,grid,tsdfGrid,largest,ptrComponentCloud);
 }
 
 int main (int argc, char * argv[])
@@ -153,19 +153,47 @@ int main (int argc, char * argv[])
             }
         }
     }
-    std::cout << "TSDF point cloud generated. The cloud has " << count << " points." << std::endl;
+
     // Calculate size of the matrix to perform operations on
     int startPoint[3] = {minX, minY, minZ};
     int matrixSize[3] = {maxX-minX+1, maxY-minY+1, maxZ-minZ+1};
-    // Run connected component
-    pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);
-    connectedComponents(ptrCloud, ptrComponentCloud, startPoint, matrixSize);
-    pcl::visualization::CloudViewer viewer("Cloud Viewer");
-    viewer.showCloud(ptrComponentCloud);
-    while (!viewer.wasStopped ())
-    {
 
+    // Create the TSDF grid for marching cubes
+    std::vector<std::vector<std::vector<float>>> grid;
+    grid.resize((unsigned) matrixSize[0]);
+    for (int i = 0; i < matrixSize[0]; i++) {
+        grid[i].resize((unsigned) matrixSize[1]);
+
+        for (int j = 0; j < matrixSize[1]; j++) {
+            grid[i][j].resize((unsigned) matrixSize[2]);
+        }
     }
+    // Read the file again for corresponding float values
+    fp = fopen(tsdfName.c_str(), "r");
+    fp2 = fopen(tsdfName2.c_str(), "r");
+    for (int i = 0; i < 512; i++) {
+        for (int j = 0; j < 512; j++){
+            for (int k = 0; k < 512; k++){
+                if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
+                    // Naively add point if value in the first cloud is positive & in the second cloud is negative.
+                    if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
+                        if(i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ){
+                            grid[i-minX][j-minY][k-minZ] = tsdfval2;
+                        }
+                    } else {
+                        std::cerr << "tsdf2.bin is corrupted. TSDF format should be a 512*512*512 float array." << std::endl;
+                        return 1;
+                    }
+                } else {
+                    std::cerr << "tsdf.bin is corrupted. TSDF format should be a 512*512*512 float array." << std::endl;
+                    return 1;
+                }
+            }
+        }
+    }
+
+    std::cout << "TSDF point cloud generated. The cloud has " << count << " points." << std::endl;
+    // Run connected component
+    connectedComponents(ptrCloud, startPoint, matrixSize, grid);
     return (0);
 }
