@@ -2,11 +2,36 @@
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/visualization/cloud_viewer.h>
-void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoint[3], int matrixSize[3])
+#include "marching_cubes.h"
+
+uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 200},{245, 130, 48},{145, 30, 180},
+                       {70, 240, 240},{240, 50, 230},{210, 245, 60},{250, 190, 190},{0, 128, 128},{230, 190, 255},
+                       {170, 110, 40},{255, 250, 200},{128, 0, 0},{170, 255, 195},{128, 128, 0},{255, 215, 180},
+                       {0, 0, 128},{128, 128, 128}};
+float threshold = 0.7;
+
+int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, int k, short int index)
+{
+    if (i < 0 || i >= grid.size() || j < 0 || j >= grid[0].size() || k < 0 || k >= grid[0][0].size() ){
+        return 0;
+    }
+    // Only count if not visited
+    if(grid[i][j][k] != 1){
+        return 0;
+    }
+    // Change value of the cell
+    grid[i][j][k] = index;
+    // Call dfs to iterate through its neighbors
+    return 1 + dfs(grid,i,j,k-1,index) + dfs(grid,i,j,k+1,index) + dfs(grid,i,j-1,k,index)
+           + dfs(grid,i,j+1,k,index) + dfs(grid,i+1,j,k,index) + dfs(grid,i-1,j,k,index);
+
+}
+
+void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr componentCloud, int startPoint[3], int matrixSize[3])
 {
     // Set up grid in heap
-    // 'e': empty; 'o': occupied, 'v': visited
-    std::vector<std::vector<std::vector<char>>> grid;
+    // 0: empty; 1: occupied, >1: visited
+    std::vector<std::vector<std::vector<short int>>> grid;
     grid.resize((unsigned) matrixSize[0]);
     for (int i = 0; i < matrixSize[0]; i++) {
         grid[i].resize((unsigned) matrixSize[1]);
@@ -15,13 +40,61 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
             grid[i][j].resize((unsigned) matrixSize[2]);
 
             for (int k = 0; k < matrixSize[2];k++) {
-                grid[i][j][k] = 'e';
+                grid[i][j][k] = 0;
             }
         }
     }
     for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud->begin(); it!= cloud->end(); it++){
-        // std::cout << it->x << ", " << it->y << ", " << it->z << std::endl;
+        grid[it->x - startPoint[0]][it->y - startPoint[1]][it->z - startPoint[2]] = 1;
     }
+
+    // Connected component
+    std::cout << "Running connected components..." << std::endl;
+    short int index = 1;
+    int count = 0;
+    int largest = 0;
+    int max = 0;
+    for (int i = 0; i < matrixSize[0]; i++) {
+        for (int j = 0; j < matrixSize[1]; j++) {
+            for (int k = 0; k < matrixSize[2];k++) {
+                if(grid[i][j][k] == 1){
+                    index++;
+                    count = dfs(grid, i,j,k, index);
+                    if(count > max){
+                        max = count;
+                        largest = index;
+                    }
+                }
+            }
+        }
+    }
+
+    // Point cloud visualization
+    for (int i = 0; i < matrixSize[0]; i++) {
+        for (int j = 0; j < matrixSize[1]; j++) {
+            for (int k = 0; k < matrixSize[2];k++) {
+                if(grid[i][j][k] > 1){
+                    if(grid[i][j][k] == largest){
+                        pcl::PointXYZRGB point = pcl::PointXYZRGB(255,255,255);
+                        point.x = i;
+                        point.y = j;
+                        point.z = k;
+                        componentCloud->push_back(point);
+
+                    }else{
+                        pcl::PointXYZRGB point = pcl::PointXYZRGB(rgbTable[grid[i][j][k]%20][0], rgbTable[grid[i][j][k]%20][1], rgbTable[grid[i][j][k]%20][2]);
+                        point.x = i;
+                        point.y = j;
+                        point.z = k;
+                        componentCloud->push_back(point);
+                    }
+                }
+            }
+        }
+    }
+
+    // Run marching cubes
+    MarchingCubes::marchingCube(matrixSize,grid,largest);
 }
 
 int main (int argc, char * argv[])
@@ -59,7 +132,7 @@ int main (int argc, char * argv[])
                 if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
                     // Naively add point if value in the first cloud is positive & in the second cloud is negative.
                     if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
-                        if(tsdfval1 > 0 && tsdfval2 < 0){
+                        if(tsdfval1 > 0 && tsdfval2 < 0 && tsdfval1-tsdfval2 > threshold){
                             cloud.push_back(pcl::PointXYZ(i, j, k));
                             minX = (i < minX) ? i : minX;
                             minY = (j < minY) ? j : minY;
@@ -80,21 +153,19 @@ int main (int argc, char * argv[])
             }
         }
     }
-    std::cout << "TSDF point cloud generated." << std::endl;
-
+    std::cout << "TSDF point cloud generated. The cloud has " << count << " points." << std::endl;
     // Calculate size of the matrix to perform operations on
     int startPoint[3] = {minX, minY, minZ};
     int matrixSize[3] = {maxX-minX+1, maxY-minY+1, maxZ-minZ+1};
     // Run connected component
-    connectedComponents(ptrCloud, startPoint, matrixSize);
-
-    /**
+    pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);
+    connectedComponents(ptrCloud, ptrComponentCloud, startPoint, matrixSize);
     pcl::visualization::CloudViewer viewer("Cloud Viewer");
-    viewer.showCloud(ptrCloud);
+    viewer.showCloud(ptrComponentCloud);
     while (!viewer.wasStopped ())
     {
 
     }
-     **/
     return (0);
 }
