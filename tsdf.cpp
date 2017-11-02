@@ -106,10 +106,10 @@ int main (int argc, char * argv[])
 
     // Loading files
     if (argc != 2) {
-		std::cout << "usage: ./tsdf <TSDF binary file directory>."
+		std::cout << "The TSDF without the object should be named tsdf.bin and the file with object should be named tsdf2.bin."
                   << std::endl
-                  << "File should be named tsdf.bin and tsdf2.bin. Default is current folder."
-                  << std::endl;
+                  << "Place these two files in this directory or provide its directory as a parameter when running the program."
+                  << std::endl << std::endl;
 	} else {
 		tsdfDirectory = std::string(argv[1]);
 	}
@@ -168,24 +168,18 @@ int main (int argc, char * argv[])
             grid[i][j].resize((unsigned) matrixSize[2]);
         }
     }
+
     // Read the file again for corresponding float values
-    fp = fopen(tsdfName.c_str(), "r");
     fp2 = fopen(tsdfName2.c_str(), "r");
     for (int i = 0; i < 512; i++) {
         for (int j = 0; j < 512; j++){
             for (int k = 0; k < 512; k++){
-                if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
-                    // Naively add point if value in the first cloud is positive & in the second cloud is negative.
-                    if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
-                        if(i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ){
-                            grid[i-minX][j-minY][k-minZ] = tsdfval2;
-                        }
-                    } else {
-                        std::cerr << "tsdf2.bin is corrupted. TSDF format should be a 512*512*512 float array." << std::endl;
-                        return 1;
+                if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
+                    if(i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ){
+                        grid[i-minX][j-minY][k-minZ] = tsdfval2;
                     }
                 } else {
-                    std::cerr << "tsdf.bin is corrupted. TSDF format should be a 512*512*512 float array." << std::endl;
+                    std::cerr << "tsdf2.bin is corrupted. TSDF format should be a 512*512*512 float array." << std::endl;
                     return 1;
                 }
             }

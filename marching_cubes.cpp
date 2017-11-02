@@ -129,9 +129,8 @@ void MarchingCubes::marchingCube(
         std::vector<std::vector<std::vector<float>>>& tsdfGrid,
         int index,pcl::PointCloud<pcl::PointXYZRGB>::Ptr componentCloud)
 {
-    std::cout << "Implementing Marching Cubes Algorithm..." << std::endl;
+    std::cout << "Running Marching Cubes..." << std::endl;
     std::cout.flush();
-    std::cout << index << std::endl;
 
     pcl::PointCloud<pcl::PointXYZ> cloud;
     pcl::PointCloud<pcl::PointXYZ>::Ptr ptrCloud(&cloud);
@@ -184,6 +183,10 @@ void MarchingCubes::marchingCube(
     pcl::io::savePLYFile ("subtracted_TSDF_mesh.ply", Mesh);
     std::cout << "PLY file saved." << std::endl;
 
+    std::cout << "Visualzing point clouds..."
+              << std::endl
+              << "The point cloud shows all the connected components in different colors. The white one is the largest."
+              << std::endl;
     // Show cloud after marching cubes
     pcl::visualization::CloudViewer viewer("Cloud Viewer");
     viewer.showCloud(componentCloud);
