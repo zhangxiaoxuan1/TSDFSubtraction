@@ -159,39 +159,34 @@ int main (int argc, char * argv[])
     int matrixSize[3] = {maxX-minX+1, maxY-minY+1, maxZ-minZ+1};
 
     // Create the TSDF grid for marching cubes
-    std::vector<std::vector<std::vector<float>>> grid;
-    grid.resize((unsigned) matrixSize[0]);
+    std::vector<std::vector<std::vector<float>>> tsdfGrid;
+    tsdfGrid.resize((unsigned) matrixSize[0]);
     for (int i = 0; i < matrixSize[0]; i++) {
-        grid[i].resize((unsigned) matrixSize[1]);
+        tsdfGrid[i].resize((unsigned) matrixSize[1]);
 
         for (int j = 0; j < matrixSize[1]; j++) {
-            grid[i][j].resize((unsigned) matrixSize[2]);
+            tsdfGrid[i][j].resize((unsigned) matrixSize[2]);
         }
     }
 
     // Read the file again for corresponding float values
-    fp = fopen(tsdfName.c_str(), "r");
-    fp2 = fopen(tsdfName2.c_str(), "r");
+    FILE * fp3 = fopen(tsdfName.c_str(), "r");
+    FILE * fp4 = fopen(tsdfName2.c_str(), "r");
     for (int i = 0; i < 512; i++) {
         for (int j = 0; j < 512; j++){
             for (int k = 0; k < 512; k++){
-                if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
-                    if (fread((void *) (&tsdfval2), sizeof(tsdfval2), 1, fp2)) {
+                if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp3)) {
+                    if (fread((void *) (&tsdfval2), sizeof(tsdfval2), 1, fp4)) {
                         if (i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ) {
-                            grid[i - minX][j - minY][k - minZ] = std::max(tsdfval2, -tsdfval1);
+                            tsdfGrid[i - minX][j - minY][k - minZ] = std::max(tsdfval2, -tsdfval1);
                         }
-                    } else {
-                        std::cerr << "tsdf2.bin is corrupted. TSDF format should be a 512*512*512 float array."
-                                  << std::endl;
-                        return 1;
                     }
                 }
             }
         }
     }
-
     std::cout << "TSDF point cloud generated. The cloud has " << count << " points." << std::endl;
     // Run connected component
-    connectedComponents(ptrCloud, startPoint, matrixSize, grid);
+    connectedComponents(ptrCloud, startPoint, matrixSize, tsdfGrid);
     return (0);
 }
