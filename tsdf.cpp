@@ -170,17 +170,21 @@ int main (int argc, char * argv[])
     }
 
     // Read the file again for corresponding float values
+    fp = fopen(tsdfName.c_str(), "r");
     fp2 = fopen(tsdfName2.c_str(), "r");
     for (int i = 0; i < 512; i++) {
         for (int j = 0; j < 512; j++){
             for (int k = 0; k < 512; k++){
-                if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
-                    if(i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ){
-                        grid[i-minX][j-minY][k-minZ] = tsdfval2;
+                if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
+                    if (fread((void *) (&tsdfval2), sizeof(tsdfval2), 1, fp2)) {
+                        if (i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ) {
+                            grid[i - minX][j - minY][k - minZ] = std::max(tsdfval2, -tsdfval1);
+                        }
+                    } else {
+                        std::cerr << "tsdf2.bin is corrupted. TSDF format should be a 512*512*512 float array."
+                                  << std::endl;
+                        return 1;
                     }
-                } else {
-                    std::cerr << "tsdf2.bin is corrupted. TSDF format should be a 512*512*512 float array." << std::endl;
-                    return 1;
                 }
             }
         }

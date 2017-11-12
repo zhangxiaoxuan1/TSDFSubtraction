@@ -14,10 +14,16 @@ struct Cell {
 } ;
 int count = 0;
 float isolevel = 0;
+int strangeCount = 0;
 // Calculate the intersection on an edge
 pcl::PointXYZ VertexInterp(pcl::PointXYZ p1,pcl::PointXYZ p2,float valp1,float valp2) {
     float mu;
     pcl::PointXYZ p;
+
+    // If jump is too big, it is suspicious
+    if (std::abs(valp1-valp2) > 0.8){
+        strangeCount ++;
+    }
 
     if (std::abs(isolevel-valp1) < 0.00001){
         return(p1);
@@ -59,6 +65,7 @@ int process_cube(Cell grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int index
     pcl::PointXYZ vertlist[12];
 
     // Find the points where the surface intersects the cube
+    strangeCount = 0;
     if (edgeTable[cubeindex] & 1){
         vertlist[0] = VertexInterp(grid.vert[0],grid.vert[1],grid.tsdfVal[0],grid.tsdfVal[1]);
     }
@@ -95,12 +102,9 @@ int process_cube(Cell grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int index
     if (edgeTable[cubeindex] & 2048){
         vertlist[11] = VertexInterp(grid.vert[3],grid.vert[7],grid.tsdfVal[3],grid.tsdfVal[7]);
     }
-    for(int i=0;i<12;i++){
-        if(vertlist[i].x < 0){
-            return(0);
-        }
+    if(strangeCount >=1 && (grid.tsdfVal[0]==0 || grid.tsdfVal[1]==0 || grid.tsdfVal[2]==0 ||grid.tsdfVal[3]==0 ||grid.tsdfVal[4]==0 ||grid.tsdfVal[5]==0 ||grid.tsdfVal[6]==0 ||grid.tsdfVal[7]==0)){
+        return (0);
     }
-
     // Create the triangle
     int triangle_count = 0;
     pcl::PointXYZ triangle[3];
@@ -139,7 +143,6 @@ void MarchingCubes::marchingCube(
     struct Cell gridcell;
     double vert[8][3];
     float val[8];
-
 
     // Calculate gridcells
     for(int i = 0;i < matrixSize[0] - 1;i++){
