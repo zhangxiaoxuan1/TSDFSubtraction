@@ -15,16 +15,24 @@ struct Cell {
 int count = 0;
 float isolevel = 0;
 int strangeCount = 0;
+bool includesOccluding = true;
+bool nearbyOccluding = false;
+int minX = 512,maxX = -1,minY = 512,maxY = -1,minZ = 512,maxZ = -1;
+int tolerance = 5;
+
 // Calculate the intersection on an edge
 pcl::PointXYZ VertexInterp(float isolevel,pcl::PointXYZ p1,pcl::PointXYZ p2,float valp1,float valp2) {
     float mu;
     pcl::PointXYZ p;
 
+    // Check if it is occluding
+    if((valp1 == 0 && valp2 > 0)||(valp1 > 0 && valp2 == 0) && std::abs(valp1-valp2) < 0.3){
+        nearbyOccluding = true;
+    }
     // If jump is too big, it is suspicious
     if (std::abs(valp1-valp2) > 0.8){
         strangeCount ++;
     }
-
 
     if (std::abs(isolevel-valp1) < 0.00001){
         return(p1);
@@ -45,11 +53,6 @@ pcl::PointXYZ VertexInterp(float isolevel,pcl::PointXYZ p1,pcl::PointXYZ p2,floa
 
 int process_cube(Cell grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int index) {
 
-    // Only recreate the largest component
-    if (grid.indicator[0]!=index && grid.indicator[1]!=index && grid.indicator[2]!=index && grid.indicator[3]!=index &&
-        grid.indicator[4]!=index &&grid.indicator[5]!=index && grid.indicator[6]!=index && grid.indicator[7]!=index){
-        return(0);
-    }
     int cubeindex = 0;
     if (grid.val[0] <= isolevel) cubeindex |= 1;
     if (grid.val[1] <= isolevel) cubeindex |= 2;
@@ -68,6 +71,7 @@ int process_cube(Cell grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int index
 
     // Find the points where the surface intersects the cube
     strangeCount = 0;
+    nearbyOccluding = false;
     if (edgeTable[cubeindex] & 1){
         vertlist[0] = VertexInterp(isolevel,grid.vert[0],grid.vert[1],grid.val[0],grid.val[1]);
     }
@@ -104,8 +108,23 @@ int process_cube(Cell grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int index
     if (edgeTable[cubeindex] & 2048){
         vertlist[11] = VertexInterp(isolevel,grid.vert[3],grid.vert[7],grid.val[3],grid.val[7]);
     }
-    if(strangeCount >=1 && (grid.val[0]==0 || grid.val[1]==0 || grid.val[2]==0 ||grid.val[3]==0 ||grid.val[4]==0 ||grid.val[5]==0 ||grid.val[6]==0 ||grid.val[7]==0)){
-        return (0);
+
+    // Check if it is nearby
+    if(nearbyOccluding){
+        if(grid.vert[0].x < minX - tolerance || grid.vert[0].x > maxX + tolerance || grid.vert[0].y < minY - tolerance
+           || grid.vert[0].y > maxY + tolerance || grid.vert[0].z < minZ - tolerance || grid.vert[0].z > maxZ + tolerance){
+            nearbyOccluding = false;
+        }
+    }
+    if(!includesOccluding || !nearbyOccluding){
+        // Only recreate the largest component
+        if (grid.indicator[0]!=index && grid.indicator[1]!=index && grid.indicator[2]!=index && grid.indicator[3]!=index &&
+            grid.indicator[4]!=index &&grid.indicator[5]!=index && grid.indicator[6]!=index && grid.indicator[7]!=index){
+            return(0);
+        }
+        if(strangeCount >=1 && (grid.val[0]==0 || grid.val[1]==0 || grid.val[2]==0 ||grid.val[3]==0 ||grid.val[4]==0 ||grid.val[5]==0 ||grid.val[6]==0 ||grid.val[7]==0)){
+            return (0);
+        }
     }
 
     // Create the triangle
@@ -147,6 +166,23 @@ void MarchingCubes::marchingCube(
     double vert[8][3];
     float val[8];
 
+    // Get largest component location
+    if(includesOccluding){
+        for(int i = 0;i < matrixSize[0] - 1;i++){
+            for(int j = 0; j < matrixSize[1] - 1; j++) {
+                for(int k = 0; k < matrixSize[2] - 1; k++) {
+                    if(grid[i][j][k] ==  index){
+                        minX = (i < minX) ? i : minX;
+                        minY = (j < minY) ? j : minY;
+                        minZ = (k < minZ) ? k : minZ;
+                        maxX = (i > maxX) ? i : maxX;
+                        maxY = (j > maxY) ? j : maxY;
+                        maxZ = (k > maxZ) ? k : maxZ;
+                    }
+                }
+            }
+        }
+    }
 
     // Calculate gridcells
     for(int i = 0;i < matrixSize[0] - 1;i++){
