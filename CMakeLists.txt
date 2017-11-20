@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 2.8.8)
 project(TSDF C CXX)
 
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_FLAGS "-fpermissive")
 
 find_package(PCL REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})

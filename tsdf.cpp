@@ -1,4 +1,6 @@
 // include required libraries
+#include <functional>
+#include <queue>
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
 #include "marching_cubes.h"
@@ -7,6 +9,8 @@ uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 2
                        {70, 240, 240},{240, 50, 230},{210, 245, 60},{250, 190, 190},{0, 128, 128},{230, 190, 255},
                        {170, 110, 40},{255, 250, 200},{128, 0, 0},{170, 255, 195},{128, 128, 0},{255, 215, 180},
                        {0, 0, 128},{128, 128, 128}};
+// Red, green,yellow,blue,orange,purple,teal,pink,yellow/green,light pink,green/blue,pink/purple,brown,light yellow,
+// dark brown,light green,brown/green,pink/yellow,dark blue, grey
 float threshold = 0.7;
 
 int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, int k, short int index)
@@ -14,6 +18,8 @@ int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, in
     if (i < 0 || i >= grid.size() || j < 0 || j >= grid[0].size() || k < 0 || k >= grid[0][0].size() ){
         return 0;
     }
+
+
     // Only count if not visited
     if(grid[i][j][k] != 1){
         return 0;
@@ -25,12 +31,14 @@ int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, in
            + dfs(grid,i,j+1,k,index) + dfs(grid,i+1,j,k,index) + dfs(grid,i-1,j,k,index);
 
 }
+bool comp (std::vector<int>& i,std::vector<int>& j) { return (i[1]>j[1]); }
 
 void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoint[3], int matrixSize[3], std::vector<std::vector<std::vector<float>>>& tsdfGrid)
 {
     // Set up grid in heap
     // 0: empty; 1: occupied, >1: visited
     std::vector<std::vector<std::vector<short int>>> grid;
+    std::vector<std::vector<int>> componentArr;
     grid.resize((unsigned) matrixSize[0]);
     for (int i = 0; i < matrixSize[0]; i++) {
         grid[i].resize((unsigned) matrixSize[1]);
@@ -43,31 +51,36 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
             }
         }
     }
+
+
     for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud->begin(); it!= cloud->end(); it++){
         grid[it->x - startPoint[0]][it->y - startPoint[1]][it->z - startPoint[2]] = 1;
     }
 
-    // Connected component
     std::cout << "Running connected components..." << std::endl;
-    short int index = 1;
+    int index = 1;
     int count = 0;
-    int largest = 0;
-    int max = 0;
     for (int i = 0; i < matrixSize[0]; i++) {
         for (int j = 0; j < matrixSize[1]; j++) {
             for (int k = 0; k < matrixSize[2];k++) {
                 if(grid[i][j][k] == 1){
                     index++;
-                    count = dfs(grid, i,j,k, index);
-                    if(count > max){
-                        max = count;
-                        largest = index;
-                    }
+                    std::vector<int> temp;
+                    temp.push_back(index);
+                    temp.push_back(dfs(grid, i,j,k, index));
+                    componentArr.push_back(temp);
                 }
             }
         }
     }
+    // Sort the array
+    std::sort (componentArr.begin(), componentArr.end(), comp);
+    int largest = componentArr[0][0];
 
+    std::cout << "Finished Connected Components. The top 10 components are:" << componentArr[0][0] << ","
+    << componentArr[1][0] << "," << componentArr[2][0] << "," << componentArr[3][0] << "," << componentArr[4][0]
+    << "," << componentArr[5][0] << "," << componentArr[6][0] << "," << componentArr[7][0] << "," << componentArr[8][0] << "," << componentArr[9][0]<< std::endl;
+    //largest = 1751;
     // Add points to the point cloud for visualization
     pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);
@@ -132,7 +145,7 @@ int main (int argc, char * argv[])
                 if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
                     // Naively add point if value in the first cloud is positive & in the second cloud is negative.
                     if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
-                        if(tsdfval1 > 0 && tsdfval2 < 0 && tsdfval1-tsdfval2 > threshold){
+                        if((tsdfval1 > 0 && tsdfval2 < 0 && tsdfval1-tsdfval2 > threshold)||(tsdfval1 > 0 && tsdfval2 == 0 && tsdfval1-tsdfval2 < 0.2)){
                             cloud.push_back(pcl::PointXYZ(i, j, k));
                             minX = (i < minX) ? i : minX;
                             minY = (j < minY) ? j : minY;
@@ -168,7 +181,6 @@ int main (int argc, char * argv[])
             tsdfGrid[i][j].resize((unsigned) matrixSize[2]);
         }
     }
-
     // Read the file again for corresponding float values
     FILE * fp3 = fopen(tsdfName.c_str(), "r");
     FILE * fp4 = fopen(tsdfName2.c_str(), "r");
@@ -178,7 +190,19 @@ int main (int argc, char * argv[])
                 if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp3)) {
                     if (fread((void *) (&tsdfval2), sizeof(tsdfval2), 1, fp4)) {
                         if (i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ) {
-                            tsdfGrid[i - minX][j - minY][k - minZ] = std::max(tsdfval2, -tsdfval1);
+                            if(tsdfval1 != 0 && tsdfval2 != 0){
+                                tsdfGrid[i - minX][j - minY][k - minZ] = std::max(tsdfval2, -tsdfval1);
+                            } else {
+                                if(tsdfval1 != 0){
+                                    tsdfGrid[i - minX][j - minY][k - minZ] = -tsdfval1;
+                                }
+                                if(tsdfval2 != 0){
+                                    tsdfGrid[i - minX][j - minY][k - minZ] = tsdfval2;
+                                }
+                                if (tsdfval1 == 0 && tsdfval2 == 0){
+                                    tsdfGrid[i - minX][j - minY][k - minZ] = 0;
+                                }
+                            }
                         }
                     }
                 }
