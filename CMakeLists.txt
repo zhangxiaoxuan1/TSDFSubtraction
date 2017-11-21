@@ -12,9 +12,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 add_executable(tsdf tsdf.cpp marching_cubes.cpp marching_cubes_table.h marching_cubes.h)
-add_executable(simulatetsdf simulatetsdf.cpp)
 target_link_libraries(tsdf ${PCL_LIBRARIES})
-target_link_libraries(simulatetsdf ${PCL_LIBRARIES})
 
-install(TARGETS tsdf simulatetsdf RUNTIME DESTINATION bin COMPONENT main)
+install(TARGETS tsdf RUNTIME DESTINATION bin COMPONENT main)
 install(FILES ${srcs} DESTINATION app COMPONENT main)
