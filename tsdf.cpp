@@ -80,7 +80,7 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
     std::cout << "Finished Connected Components. The top 10 components are:" << componentArr[0][0] << ","
     << componentArr[1][0] << "," << componentArr[2][0] << "," << componentArr[3][0] << "," << componentArr[4][0]
     << "," << componentArr[5][0] << "," << componentArr[6][0] << "," << componentArr[7][0] << "," << componentArr[8][0] << "," << componentArr[9][0]<< std::endl;
-    //largest = 1751;
+    // largest = 1751;
     // Add points to the point cloud for visualization
     pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);

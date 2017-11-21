@@ -64,7 +64,6 @@ int process_cube(Cell grid, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int index
 
     // Find the points where the surface intersects the cube
     strangeCount = 0;
-    nearbyOccluding = false;
     if (edgeTable[cubeindex] & 1){
         vertlist[0] = VertexInterp(isolevel,grid.vert[0],grid.vert[1],grid.val[0],grid.val[1]);
     }
@@ -152,7 +151,8 @@ void MarchingCubes::marchingCube(
 
     // Calculate gridcells
     for(int i = 0;i < matrixSize[0] - 1;i++){
-        std::cout << "Scanning layer " << i << "/" << matrixSize[0] <<"... \r";
+        std::cout << "\rScanning layer " << i << "/" << matrixSize[0] <<"...";
+        std::cout.flush();
         for(int j = 0; j < matrixSize[1] - 1; j++){
             for(int k = 0; k < matrixSize[2] - 1; k++){
                 // Retrieve 8 vertices of the gridcell.
@@ -176,7 +176,7 @@ void MarchingCubes::marchingCube(
         }
     }
 
-    std::cout << "A total of " << count << " triangles are processed." << std::endl;
+    std::cout << std::endl << "A total of " << count << " triangles are processed." << std::endl;
 
     // Process the points and convert to mesh
     pcl::PolygonMesh Mesh;
