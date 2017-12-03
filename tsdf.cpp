@@ -75,12 +75,12 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
     }
     // Sort the array
     std::sort (componentArr.begin(), componentArr.end(), comp);
-    int largest = componentArr[0][0];
+    int target = componentArr[0][0];
 
     std::cout << "Finished Connected Components. The top 10 components are:" << componentArr[0][0] << ","
     << componentArr[1][0] << "," << componentArr[2][0] << "," << componentArr[3][0] << "," << componentArr[4][0]
     << "," << componentArr[5][0] << "," << componentArr[6][0] << "," << componentArr[7][0] << "," << componentArr[8][0] << "," << componentArr[9][0]<< std::endl;
-    // largest = 1751;
+    target = 585;
     // Add points to the point cloud for visualization
     pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);
@@ -88,7 +88,7 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
         for (int j = 0; j < matrixSize[1]; j++) {
             for (int k = 0; k < matrixSize[2];k++) {
                 if(grid[i][j][k] > 1){
-                    if(grid[i][j][k] == largest){
+                    if(grid[i][j][k] == target){
                         pcl::PointXYZRGB point = pcl::PointXYZRGB(255,255,255);
                         point.x = i;
                         point.y = j;
@@ -107,7 +107,7 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
         }
     }
     // Run marching cubes
-    MarchingCubes::marchingCube(matrixSize,grid,tsdfGrid,largest,ptrComponentCloud);
+    MarchingCubes::marchingCube(matrixSize,grid,tsdfGrid,target,ptrComponentCloud);
 }
 
 float synthesizeTSDF(float v1, float v2)
@@ -116,12 +116,14 @@ float synthesizeTSDF(float v1, float v2)
         return std::max(v2, -v1);
     } else {
         if(v1 != 0){
-            return -v1;
+            // This is to get rid of the scene misalignment
+            if(v1 < 0.99){
+                return -v1;
+            } else {
+                return 0;
+            }
         }
-        if(v2 != 0){
-            return v2;
-        }
-        if (v1 == 0 && v2 == 0){
+        else{
             return 0;
         }
     }
