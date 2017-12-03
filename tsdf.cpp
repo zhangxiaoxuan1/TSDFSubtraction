@@ -110,6 +110,23 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
     MarchingCubes::marchingCube(matrixSize,grid,tsdfGrid,largest,ptrComponentCloud);
 }
 
+float synthesizeTSDF(float v1, float v2)
+{
+    if(v1 != 0 && v2 != 0){
+        return std::max(v2, -v1);
+    } else {
+        if(v1 != 0){
+            return -v1;
+        }
+        if(v2 != 0){
+            return v2;
+        }
+        if (v1 == 0 && v2 == 0){
+            return 0;
+        }
+    }
+}
+
 int main (int argc, char * argv[])
 {
     float tsdfval1 = 0;
@@ -145,7 +162,7 @@ int main (int argc, char * argv[])
                 if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
                     // Naively add point if value in the first cloud is positive & in the second cloud is negative.
                     if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
-                        if((tsdfval1 > 0 && tsdfval2 < 0 && tsdfval1-tsdfval2 > threshold)||(tsdfval1 > 0 && tsdfval2 == 0 && tsdfval1-tsdfval2 < 0.2)){
+                        if(synthesizeTSDF(tsdfval1, tsdfval2) < 0){
                             cloud.push_back(pcl::PointXYZ(i, j, k));
                             minX = (i < minX) ? i : minX;
                             minY = (j < minY) ? j : minY;
@@ -190,19 +207,7 @@ int main (int argc, char * argv[])
                 if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp3)) {
                     if (fread((void *) (&tsdfval2), sizeof(tsdfval2), 1, fp4)) {
                         if (i >= minX && i <= maxX && j >= minY && j <= maxY && k >= minZ && k <= maxZ) {
-                            if(tsdfval1 != 0 && tsdfval2 != 0){
-                                tsdfGrid[i - minX][j - minY][k - minZ] = std::max(tsdfval2, -tsdfval1);
-                            } else {
-                                if(tsdfval1 != 0){
-                                    tsdfGrid[i - minX][j - minY][k - minZ] = -tsdfval1;
-                                }
-                                if(tsdfval2 != 0){
-                                    tsdfGrid[i - minX][j - minY][k - minZ] = tsdfval2;
-                                }
-                                if (tsdfval1 == 0 && tsdfval2 == 0){
-                                    tsdfGrid[i - minX][j - minY][k - minZ] = 0;
-                                }
-                            }
+                            tsdfGrid[i - minX][j - minY][k - minZ] = synthesizeTSDF(tsdfval1, tsdfval2);
                         }
                     }
                 }
