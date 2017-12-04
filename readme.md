@@ -10,3 +10,13 @@ tsdf is a faster tool for visualization that simply ouput a point cloud of all
 the points in the TSDF with negative values.
 
 This program requires PCL.
+
+## Usage
+
+The background TSDF should be named tsdf.bin and the TSDF with the object should be named tsdf2.bin.
+Place these two files in this directory or provide its directory as a parameter when running the program.
+
+By default the program will reconstruct the largest connected component. In case the target object is not the largest connected
+component you can manually provide the index of the target object. The indeces of the top 10 largest components are printed in the console, and 
+different components are given different colors in the color table according to thier indeces (%20). 
+The color table is shown in the included color.html. You can thus find out the desired component according to its color. 
