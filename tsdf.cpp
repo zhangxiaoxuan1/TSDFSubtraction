@@ -33,7 +33,7 @@ int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, in
 }
 bool comp (std::vector<int>& i,std::vector<int>& j) { return (i[1]>j[1]); }
 
-void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoint[3], int matrixSize[3], std::vector<std::vector<std::vector<float>>>& tsdfGrid)
+void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoint[3], int matrixSize[3], std::vector<std::vector<std::vector<float>>>& tsdfGrid, int enteredTarget)
 {
     // Set up grid in heap
     // 0: empty; 1: occupied, >1: visited
@@ -80,7 +80,9 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
     std::cout << "Finished Connected Components. The top 10 components are:" << componentArr[0][0] << ","
     << componentArr[1][0] << "," << componentArr[2][0] << "," << componentArr[3][0] << "," << componentArr[4][0]
     << "," << componentArr[5][0] << "," << componentArr[6][0] << "," << componentArr[7][0] << "," << componentArr[8][0] << "," << componentArr[9][0]<< std::endl;
-    target = 585;
+    if(enteredTarget != -1){
+        target = enteredTarget;
+    }
     // Add points to the point cloud for visualization
     pcl::PointCloud<pcl::PointXYZRGB> componentCloud;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr ptrComponentCloud(&componentCloud);
@@ -134,16 +136,25 @@ int main (int argc, char * argv[])
     float tsdfval1 = 0;
     float tsdfval2 = 0;
     int minX = 512,maxX = -1,minY = 512,maxY = -1,minZ = 512,maxZ = -1;
+    int target = -1;
     std::string tsdfDirectory = ".";
 
-    // Loading files
-    if (argc != 2) {
+    // Load files
+    if (argc < 2) {
 		std::cout << "The TSDF without the object should be named tsdf.bin and the file with object should be named tsdf2.bin."
                   << std::endl
                   << "Place these two files in this directory or provide its directory as a parameter when running the program."
                   << std::endl << std::endl;
 	} else {
-		tsdfDirectory = std::string(argv[1]);
+        if(std::string(argv[1]).compare(std::string("-l")) != 0){
+            std::cout << std::string(argv[1]);
+            tsdfDirectory = std::string(argv[1]);
+            if(argc > 3 && std::string(argv[2]).compare("-l")){
+                target = atoi(argv[3]);
+            }
+        } else {
+            target = atoi(argv[2]);
+        }
 	}
     std::string tsdfName = tsdfDirectory + "/tsdf.bin";
     std::string tsdfName2 = tsdfDirectory + "/tsdf2.bin";
@@ -218,6 +229,6 @@ int main (int argc, char * argv[])
     }
     std::cout << "TSDF point cloud generated. The cloud has " << count << " points." << std::endl;
     // Run connected component
-    connectedComponents(ptrCloud, startPoint, matrixSize, tsdfGrid);
+    connectedComponents(ptrCloud, startPoint, matrixSize, tsdfGrid, target);
     return (0);
 }
