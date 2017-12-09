@@ -11,7 +11,7 @@ uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 2
                        {0, 0, 128},{128, 128, 128}};
 // Red, green,yellow,blue,orange,purple,teal,pink,yellow/green,light pink,green/blue,pink/purple,brown,light yellow,
 // dark brown,light green,brown/green,pink/yellow,dark blue, grey
-float threshold = 0.7;
+float noiseFilter = 0;
 
 int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, int k, short int index)
 {
@@ -59,7 +59,6 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
 
     std::cout << "Running connected components..." << std::endl;
     int index = 1;
-    int count = 0;
     for (int i = 0; i < matrixSize[0]; i++) {
         for (int j = 0; j < matrixSize[1]; j++) {
             for (int k = 0; k < matrixSize[2];k++) {
@@ -115,7 +114,12 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
 float synthesizeTSDF(float v1, float v2)
 {
     if(v1 != 0 && v2 != 0){
-        return std::max(v2, -v1);
+        // noiseFilter currently set to 0 (no influence) but can set to higher values to reduce noise (at cost of missing some parts of object)
+        if(std::abs(v1-v2)>noiseFilter){
+            return std::max(v2, -v1);
+        } else {
+            return 0;
+        }
     } else {
         if(v1 != 0){
             // This is to get rid of the scene misalignment
@@ -173,7 +177,6 @@ int main (int argc, char * argv[])
         for (int j = 0; j < 512; j++){
             for (int k = 0; k < 512; k++){
                 if(fread((void*)(&tsdfval1), sizeof(tsdfval1), 1, fp)) {
-                    // Naively add point if value in the first cloud is positive & in the second cloud is negative.
                     if(fread((void*)(&tsdfval2), sizeof(tsdfval2), 1, fp2)){
                         if(synthesizeTSDF(tsdfval1, tsdfval2) < 0){
                             cloud.push_back(pcl::PointXYZ(i, j, k));
@@ -200,7 +203,6 @@ int main (int argc, char * argv[])
     // Calculate size of the matrix to perform operations on
     int startPoint[3] = {minX, minY, minZ};
     int matrixSize[3] = {maxX-minX+1, maxY-minY+1, maxZ-minZ+1};
-
     // Create the TSDF grid for marching cubes
     std::vector<std::vector<std::vector<float>>> tsdfGrid;
     tsdfGrid.resize((unsigned) matrixSize[0]);
