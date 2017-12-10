@@ -3,6 +3,7 @@
 #include <queue>
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
+#include <queue>
 #include "marching_cubes.h"
 
 uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 200},{245, 130, 48},{145, 30, 180},
@@ -13,22 +14,46 @@ uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 2
 // dark brown,light green,brown/green,pink/yellow,dark blue, grey
 float noiseFilter = 0;
 
-int dfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, int k, short int index)
+int bfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, int k, short int index)
 {
-    if (i < 0 || i >= grid.size() || j < 0 || j >= grid[0].size() || k < 0 || k >= grid[0][0].size() ){
-        return 0;
-    }
-
-
-    // Only count if not visited
+    // Only do bfs if not visited
     if(grid[i][j][k] != 1){
         return 0;
     }
-    // Change value of the cell
+    int total = 1;
+    std::queue<std::vector<int>> connected;
+    connected.push({i,j,k});
+    // Change value of the first cell
     grid[i][j][k] = index;
-    // Call dfs to iterate through its neighbors
-    return 1 + dfs(grid,i,j,k-1,index) + dfs(grid,i,j,k+1,index) + dfs(grid,i,j-1,k,index)
-           + dfs(grid,i,j+1,k,index) + dfs(grid,i+1,j,k,index) + dfs(grid,i-1,j,k,index);
+    while(connected.size() > 0){
+        std::vector<int> currPos = connected.front();
+        connected.pop();
+        int posArr[6][3] = {{currPos[0],currPos[1],currPos[2]-1},
+                            {currPos[0],currPos[1],currPos[2]+1},
+                            {currPos[0],currPos[1]-1,currPos[2]},
+                            {currPos[0],currPos[1]+1,currPos[2]},
+                            {currPos[0]+1,currPos[1],currPos[2]},
+                            {currPos[0]-1,currPos[1],currPos[2]}};
+        for (int l = 0; l < 6; l++){
+            int newI = posArr[l][0];
+            int newJ = posArr[l][1];
+            int newK = posArr[l][2];
+            // Check for boundary
+            if(newI < 0 || newI >= grid.size() || newJ < 0 || newJ >= grid[0].size() || newK < 0 || newK >= grid[0][0].size()){
+                continue;
+            }
+            if(grid[newI][newJ][newK] != 1){
+                continue;
+            }
+            // Current cell is part of the component
+            total ++;
+            // Change current cell to visited
+            grid[newI][newJ][newK] = index;
+            connected.push({newI,newJ,newK});
+        }
+    }
+    // Call Return size of the component
+    return total;
 
 }
 bool comp (std::vector<int>& i,std::vector<int>& j) { return (i[1]>j[1]); }
@@ -66,7 +91,7 @@ void connectedComponents(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int startPoi
                     index++;
                     std::vector<int> temp;
                     temp.push_back(index);
-                    temp.push_back(dfs(grid, i,j,k, index));
+                    temp.push_back(bfs(grid, i,j,k, index));
                     componentArr.push_back(temp);
                 }
             }
@@ -115,19 +140,14 @@ float synthesizeTSDF(float v1, float v2)
 {
     if(v1 != 0 && v2 != 0){
         // noiseFilter currently set to 0 (no influence) but can set to higher values to reduce noise (at cost of missing some parts of object)
-        if(std::abs(v1-v2)>noiseFilter){
+        if(std::abs(v1-v2)>=noiseFilter){
             return std::max(v2, -v1);
         } else {
             return 0;
         }
     } else {
         if(v1 != 0){
-            // This is to get rid of the scene misalignment
-            if(v1 < 0.99){
-                return -v1;
-            } else {
-                return 0;
-            }
+            return -v1;
         }
         else{
             return 0;
