@@ -13,7 +13,7 @@ uint8_t rgbTable[20][3] = {{230, 25, 75},{60, 180, 75},{255, 225, 25},{0, 130, 2
 // Red, green,yellow,blue,orange,purple,teal,pink,yellow/green,light pink,green/blue,pink/purple,brown,light yellow,
 // dark brown,light green,brown/green,pink/yellow,dark blue, grey
 float noiseFilter = 0;
-
+float threhold = 1;
 int bfs (std::vector<std::vector<std::vector<short int>>>& grid,int i, int j, int k, short int index)
 {
     // Only do bfs if not visited
@@ -147,7 +147,12 @@ float synthesizeTSDF(float v1, float v2)
         }
     } else {
         if(v1 != 0){
-            return -v1;
+            // threhold currently set to 1 (no influence) but can set to lower value to reduce noise (at cost of missing some parts of object)
+            if(v1 <= threhold){
+                return -v1;
+            } else {
+                return 0;
+            }
         }
         else{
             return 0;
